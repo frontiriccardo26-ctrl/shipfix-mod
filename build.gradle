@@ -37,7 +37,7 @@ repositories {
 
 dependencies {
     minecraft 'net.minecraftforge:forge:1.20.1-47.2.0'
-    implementation fg.deobf("org.valkyrienskies.mod:valkyrienskies-1.20.1-forge:2.3.0-beta.2")
+    implementation fg.deobf("org.valkyrienskies.mod:valkyrienskies-1.20.1-forge:2.3.0-beta.12")
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
 }
 
