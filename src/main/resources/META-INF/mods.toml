@@ -1,0 +1,58 @@
+modLoader="javafml"
+loaderVersion="[47,)"
+license="MIT"
+
+[[dependencies.shipfix]]
+    modId="forge"
+    mandatory=true
+    versionRange="[47.2.0,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.shipfix]]
+    modId="minecraft"
+    mandatory=true
+    versionRange="[1.20.1,1.21)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.shipfix]]
+    modId="valkyrienskies"
+    mandatory=true
+    versionRange="[2.3.0,)"
+    ordering="AFTER"
+    side="BOTH"
+
+[[dependencies.shipfix]]
+    modId="c2me"
+    mandatory=false
+    versionRange="*"
+    ordering="AFTER"
+    side="BOTH"
+
+[[dependencies.shipfix]]
+    modId="lithium"
+    mandatory=false
+    versionRange="*"
+    ordering="AFTER"
+    side="BOTH"
+
+[[dependencies.shipfix]]
+    modId="ferritecore"
+    mandatory=false
+    versionRange="*"
+    ordering="AFTER"
+    side="BOTH"
+
+[[mods]]
+    modId="shipfix"
+    version="1.0.0"
+    displayName="ShipFix — VS Predictive Chunk Loader"
+    description='''
+Eliminates freeze and rubberbanding of Valkyrien Skies ships at high velocity
+by implementing a predictive, priority-based async chunk preloading system.
+Designed for space-battle maps with pre-generated worlds.
+'''
+    logoFile="shipfix.png"
+    authors="ShipFix Authors"
+    displayURL="https://github.com/shipfix/shipfix"
