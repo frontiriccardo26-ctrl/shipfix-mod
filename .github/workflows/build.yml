@@ -20,8 +20,13 @@ jobs:
       - name: Download VS Core API
         run: |
           mkdir -p libs
-          curl -L "https://maven.valkyrienskies.org/org/valkyrienskies/vs-core/vs-core-api/0.0.3-beta.6/vs-core-api-0.0.3-beta.6.jar" -o libs/vs-core-api.jar || true
-          curl -L "https://maven.valkyrienskies.org/org/valkyrienskies/vs-core/vs-core/0.0.3-beta.6/vs-core-0.0.3-beta.6.jar" -o libs/vs-core.jar || true
+          mvn dependency:get \
+            -Dartifact=org.valkyrienskies:vs-core-api:0.0.3-beta.6 \
+            -DremoteRepositories=vs::::https://maven.valkyrienskies.org \
+            -Ddest=libs/ || true
+          find ~/.m2 -name "vs-core-api*.jar" -exec cp {} libs/vs-core-api.jar \; 2>/dev/null || true
+          find ~/.m2 -name "valkyrienskies-core*.jar" -exec cp {} libs/vs-core.jar \; 2>/dev/null || true
+          ls -la libs/
 
       - name: Build
         run: gradle build
