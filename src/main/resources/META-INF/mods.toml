@@ -19,7 +19,7 @@ license="MIT"
 [[dependencies.shipfix]]
     modId="valkyrienskies"
     mandatory=true
-    versionRange="[2.2.0,)"
+    versionRange="[2.3.0,)"
     ordering="AFTER"
     side="BOTH"
 
