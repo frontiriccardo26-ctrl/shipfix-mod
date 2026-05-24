@@ -25,4 +25,3 @@ jobs:
         with:
           name: shipfix-jar
           path: build/libs/*.jar
-
