@@ -1,30 +1,20 @@
 plugins {
     id 'java'
     id 'net.minecraftforge.gradle' version '6.0.+'
-    id 'org.parchmentmc.librarian.forgegradle' version '1.+'
     id 'org.spongepowered.mixin' version '0.7.+'
 }
 
-version       = '1.0.0'
-group         = 'net.shipfix'
+version = '1.0.0'
+group = 'net.shipfix'
 archivesBaseName = 'shipfix'
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 
-println("Java: ${System.getProperty('java.version')} | JVM: ${System.getProperty('java.vm.version')} | Arch: ${System.getProperty('os.arch')}")
-
 minecraft {
-    mappings channel: 'parchment', version: '2023.09.03-1.20.1'
-
-    accessTransformer = file('src/main/resources/META-INF/accesstransformer.cfg')
-
+    mappings channel: 'official', version: '1.20.1'
     runs {
         server {
             workingDirectory project.file('run')
-            property 'forge.logging.markers', 'REGISTRIES'
-            property 'forge.logging.console.level', 'debug'
-            property 'mixin.env.remapRefMap', 'true'
-            property 'mixin.env.refMapRemappingFile', "${projectDir}/build/createSrgToMcp/output.srg"
             mods {
                 shipfix { source sourceSets.main }
             }
@@ -35,51 +25,29 @@ minecraft {
 mixin {
     add sourceSets.main, 'shipfix.refmap.json'
     config 'shipfix.mixins.json'
-    debug.verbose = true
-    debug.export = true
 }
 
 repositories {
-    maven {
-        name = 'Valkyrien Skies'
-        url  = 'https://maven.valkyrienskies.org'
-    }
-    maven { url 'https://maven.parchmentmc.org' }
+    maven { url 'https://maven.minecraftforge.net' }
+    maven { url 'https://maven.valkyrienskies.org' }
     maven { url 'https://repo.spongepowered.org/maven' }
+    mavenCentral()
 }
 
 dependencies {
     minecraft 'net.minecraftforge:forge:1.20.1-47.2.0'
-
-    // Valkyrien Skies 2 for Forge 1.20.1
-    implementation fg.deobf("org.valkyrienskies.mod:valkyrienskies-1.20.1-forge:2.3.0-beta.2")
-
-    // Mixin
-    annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
-
-    // Optional compat (compile-time only — runtime provided by user)
-    compileOnly fg.deobf("com.ishland.c2me:c2me-forge-1.20.1:0.2.0.0+0.1.0-alpha.6") { transitive = false }
-
-    // JOML is bundled with VS; include here for IDE support
     compileOnly 'org.joml:joml:1.10.5'
+    annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
 }
 
 jar {
     manifest {
         attributes([
-            'Specification-Title'     : 'shipfix',
-            'Specification-Vendor'    : 'ShipFix Authors',
-            'Specification-Version'   : '1',
-            'Implementation-Title'    : project.name,
-            'Implementation-Version'  : project.jar.archiveVersion,
-            'Implementation-Vendor'   : 'ShipFix Authors',
-            'MixinConfigs'            : 'shipfix.mixins.json'
+            'MixinConfigs': 'shipfix.mixins.json'
         ])
     }
 }
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
-    options.compilerArgs += ['--enable-preview']
-    options.release = 17
 }
