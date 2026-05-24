@@ -31,13 +31,12 @@ repositories {
     maven { url 'https://maven.minecraftforge.net' }
     maven { url 'https://maven.valkyrienskies.org' }
     maven { url 'https://repo.spongepowered.org/maven' }
-    maven { url 'https://libraries.minecraft.net' }
     mavenCentral()
 }
 
 dependencies {
     minecraft 'net.minecraftforge:forge:1.20.1-47.2.0'
-    implementation fg.deobf("org.valkyrienskies.mod:valkyrienskies-1.20.1-forge:2.3.0-beta.12")
+    compileOnly 'org.joml:joml:1.10.5'
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
 }
 
