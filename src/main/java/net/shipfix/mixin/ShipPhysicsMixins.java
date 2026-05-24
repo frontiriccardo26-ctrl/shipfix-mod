@@ -68,7 +68,10 @@ public class ShipPhysicsMixins {
     @Mixin(net.minecraft.server.level.ServerLevel.class)
     public static abstract class ServerLevelMixin {
 
-        @Inject(method = "tickChunk", at = @At("RETURN"))
+        @Inject(
+            method = "m_8714_", // tickChunk in Mojmap obfuscation
+            at = @At("RETURN")
+        )
         private void shipfix_afterTickChunk(
                 net.minecraft.world.level.chunk.LevelChunk chunk,
                 int randomTickSpeed,
