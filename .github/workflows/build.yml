@@ -17,6 +17,12 @@ jobs:
         with:
           gradle-version: '8.4'
 
+      - name: Download VS Core API
+        run: |
+          mkdir -p libs
+          curl -L "https://maven.valkyrienskies.org/org/valkyrienskies/vs-core/vs-core-api/0.0.3-beta.6/vs-core-api-0.0.3-beta.6.jar" -o libs/vs-core-api.jar || true
+          curl -L "https://maven.valkyrienskies.org/org/valkyrienskies/vs-core/vs-core/0.0.3-beta.6/vs-core-0.0.3-beta.6.jar" -o libs/vs-core.jar || true
+
       - name: Build
         run: gradle build
 
