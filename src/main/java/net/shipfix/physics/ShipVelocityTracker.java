@@ -2,129 +2,159 @@ package net.shipfix.physics;
 
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.server.ServerLifecycleHooks;
 import net.shipfix.core.ShipFixMod;
 import org.joml.Vector3d;
-import org.joml.Vector3dc;
-import org.valkyrienskies.core.api.ships.ServerShip;
-import org.valkyrienskies.core.api.ships.Ship;
-import org.valkyrienskies.mod.common.VSGameUtilsKt;
 
-import java.util.Collection;
-import java.util.Map;
+import java.lang.reflect.Method;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Tracks per-ship velocity, direction, acceleration, and angular velocity
- * every server tick. Thread-safe reads via ConcurrentHashMap snapshots.
+ * Tracks per-ship velocity, direction, acceleration, and angular velocity.
+ * Uses reflection to access VS API to avoid compile-time dependency issues.
  */
 public class ShipVelocityTracker {
 
-    /** Per-ship data snapshot, keyed by ship ID. */
     private final Map<Long, ShipMotionData> motionDataMap = new ConcurrentHashMap<>();
-
-    /** Previous-tick position cache for acceleration computation. */
     private final Map<Long, Vector3d> previousVelocityMap = new ConcurrentHashMap<>();
+
+    // Reflection cache
+    private Class<?> shipClass;
+    private Class<?> shipWorldClass;
+    private Method getAllShipsMethod;
+    private Method getIdMethod;
+    private Method getVelocityMethod;
+    private Method getOmegaMethod;
+    private Method getTransformMethod;
+    private Method getPositionMethod;
+    private Method getShipWorldMethod;
+    private boolean reflectionInitialized = false;
+    private boolean reflectionFailed = false;
+
+    private void initReflection() {
+        if (reflectionInitialized || reflectionFailed) return;
+        try {
+            shipClass = Class.forName("org.valkyrienskies.core.api.ships.ServerShip");
+            shipWorldClass = Class.forName("org.valkyrienskies.core.api.world.ShipWorld");
+            getAllShipsMethod = shipWorldClass.getMethod("getAllShips");
+
+            getIdMethod = Class.forName("org.valkyrienskies.core.api.ships.Ship")
+                    .getMethod("getId");
+            getVelocityMethod = shipClass.getMethod("getVelocity");
+            getOmegaMethod = shipClass.getMethod("getOmega");
+            getTransformMethod = Class.forName("org.valkyrienskies.core.api.ships.Ship")
+                    .getMethod("getTransform");
+
+            Class<?> transformClass = Class.forName("org.valkyrienskies.core.api.ships.properties.ShipTransform");
+            getPositionMethod = transformClass.getMethod("getPositionInWorld");
+
+            Class<?> vsUtilsClass = Class.forName("org.valkyrienskies.mod.common.VSGameUtilsKt");
+            getShipWorldMethod = vsUtilsClass.getMethod("getShipObjectWorld",
+                    net.minecraft.server.level.ServerLevel.class);
+
+            reflectionInitialized = true;
+            ShipFixMod.LOGGER.info("[ShipFix] VS reflection initialized successfully.");
+        } catch (Exception e) {
+            reflectionFailed = true;
+            ShipFixMod.LOGGER.warn("[ShipFix] VS reflection failed: {} — ship tracking disabled.", e.getMessage());
+        }
+    }
 
     @SubscribeEvent
     public void onServerTick(TickEvent.ServerTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
+        initReflection();
+        if (reflectionFailed) return;
 
-        // Iterate all loaded server-side ships
         for (net.minecraft.server.level.ServerLevel level :
-                net.minecraftforge.server.ServerLifecycleHooks.getCurrentServer().getAllLevels()) {
+                ServerLifecycleHooks.getCurrentServer().getAllLevels()) {
+            try {
+                Object shipWorld = getShipWorldMethod.invoke(null, level);
+                if (shipWorld == null) continue;
 
-            Collection<ServerShip> ships = VSGameUtilsKt.getShipObjectWorld(level) == null
-                    ? java.util.Collections.emptyList()
-                    : (Collection<ServerShip>) VSGameUtilsKt.getShipObjectWorld(level).getAllShips();
-
-            for (ServerShip ship : ships) {
-                updateShipData(ship);
+                Iterable<?> ships = (Iterable<?>) getAllShipsMethod.invoke(shipWorld);
+                for (Object ship : ships) {
+                    updateShipData(ship);
+                }
+            } catch (Exception e) {
+                // Ignore per-tick errors silently
             }
         }
-
-        // Purge data for ships that no longer exist
-        // (done lazily by checking staleness in getMotionData)
     }
 
-    private void updateShipData(ServerShip ship) {
-        long id = ship.getId();
+    private void updateShipData(Object ship) {
+        try {
+            long id = (Long) getIdMethod.invoke(ship);
 
-        // Read VS physics state
-        Vector3dc vel = ship.getVelocity();          // blocks/tick
-        Vector3dc angVel = ship.getOmega();          // rad/tick
+            Object vel = getVelocityMethod.invoke(ship);
+            Object angVel = getOmegaMethod.invoke(ship);
+            Object transform = getTransformMethod.invoke(ship);
+            Object pos = getPositionMethod.invoke(transform);
 
-        Vector3d velocity = new Vector3d(vel);
-        double speed = velocity.length();
+            double vx = (double) vel.getClass().getMethod("x").invoke(vel);
+            double vy = (double) vel.getClass().getMethod("y").invoke(vel);
+            double vz = (double) vel.getClass().getMethod("z").invoke(vel);
 
-        // Normalised direction (safe)
-        Vector3d direction = speed > 1e-6 ? new Vector3d(velocity).div(speed) : new Vector3d(0, 0, 1);
+            double ax = (double) angVel.getClass().getMethod("x").invoke(angVel);
+            double ay = (double) angVel.getClass().getMethod("y").invoke(angVel);
+            double az = (double) angVel.getClass().getMethod("z").invoke(angVel);
 
-        // Acceleration = Δvelocity / 1 tick
-        Vector3d prevVel = previousVelocityMap.getOrDefault(id, new Vector3d(velocity));
-        Vector3d acceleration = new Vector3d(velocity).sub(prevVel);
+            double px = (double) pos.getClass().getMethod("x").invoke(pos);
+            double py = (double) pos.getClass().getMethod("y").invoke(pos);
+            double pz = (double) pos.getClass().getMethod("z").invoke(pos);
 
-        previousVelocityMap.put(id, new Vector3d(velocity));
+            Vector3d velocity = new Vector3d(vx, vy, vz);
+            double speed = velocity.length();
+            Vector3d direction = speed > 1e-6 ? new Vector3d(velocity).div(speed) : new Vector3d(0, 0, 1);
 
-        ShipMotionData data = new ShipMotionData(
-                id,
-                new Vector3d(ship.getTransform().getPositionInWorld()),
-                velocity,
-                direction,
-                acceleration,
-                speed,
-                new Vector3d(angVel),
-                System.currentTimeMillis()
-        );
+            Vector3d prevVel = previousVelocityMap.getOrDefault(id, new Vector3d(velocity));
+            Vector3d acceleration = new Vector3d(velocity).sub(prevVel);
+            previousVelocityMap.put(id, new Vector3d(velocity));
 
-        motionDataMap.put(id, data);
+            ShipMotionData data = new ShipMotionData(
+                    id,
+                    new Vector3d(px, py, pz),
+                    velocity,
+                    direction,
+                    acceleration,
+                    speed,
+                    new Vector3d(ax, ay, az),
+                    System.currentTimeMillis()
+            );
+            motionDataMap.put(id, data);
+        } catch (Exception e) {
+            // Skip this ship silently
+        }
     }
 
-    /** Returns the latest motion data for a ship, or null if not tracked. */
-    public ShipMotionData getMotionData(long shipId) {
-        return motionDataMap.get(shipId);
-    }
-
-    /** Returns all currently tracked ships. */
-    public Collection<ShipMotionData> getAllMotionData() {
-        return motionDataMap.values();
-    }
-
-    /** Clears stale data for ships that no longer exist. */
-    public void clearStale(java.util.Set<Long> activeIds) {
+    public ShipMotionData getMotionData(long shipId) { return motionDataMap.get(shipId); }
+    public Collection<ShipMotionData> getAllMotionData() { return motionDataMap.values(); }
+    public void clearStale(Set<Long> activeIds) {
         motionDataMap.keySet().retainAll(activeIds);
         previousVelocityMap.keySet().retainAll(activeIds);
     }
 
-    // -----------------------------------------------------------------------
-    // Inner data class — immutable snapshot per tick
-    // -----------------------------------------------------------------------
     public static final class ShipMotionData {
         public final long shipId;
-        public final Vector3d position;       // world position (blocks)
-        public final Vector3d velocity;       // blocks / tick
-        public final Vector3d direction;      // normalised forward vector
-        public final Vector3d acceleration;   // blocks / tick²
-        public final double   speed;          // blocks / tick (magnitude)
-        public final Vector3d angularVelocity;// rad / tick
-        public final long     timestamp;      // System.currentTimeMillis()
+        public final Vector3d position;
+        public final Vector3d velocity;
+        public final Vector3d direction;
+        public final Vector3d acceleration;
+        public final double speed;
+        public final Vector3d angularVelocity;
+        public final long timestamp;
 
         public ShipMotionData(long shipId, Vector3d position, Vector3d velocity,
                               Vector3d direction, Vector3d acceleration, double speed,
                               Vector3d angularVelocity, long timestamp) {
-            this.shipId         = shipId;
-            this.position       = position;
-            this.velocity       = velocity;
-            this.direction      = direction;
-            this.acceleration   = acceleration;
-            this.speed          = speed;
-            this.angularVelocity = angularVelocity;
-            this.timestamp      = timestamp;
+            this.shipId = shipId; this.position = position; this.velocity = velocity;
+            this.direction = direction; this.acceleration = acceleration;
+            this.speed = speed; this.angularVelocity = angularVelocity;
+            this.timestamp = timestamp;
         }
 
-        /** Speed in blocks/second (20 ticks/s). */
         public double speedBlocksPerSecond() { return speed * 20.0; }
-
-        /** True if the ship is moving fast enough to need predictive preloading. */
         public boolean isMovingFast(double threshold) { return speed > threshold; }
     }
 }
